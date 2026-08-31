@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>手描き迷路ソルバー</title>
+<meta name="description" content="手描きの迷路を写真から読み込み、グラフアルゴリズム（BFS・DFS・ダイクストラ・A*）で解く過程を可視化するアプリ。" />
+<meta name="color-scheme" content="light" />
+<meta property="og:title" content="手描き迷路ソルバー" />
+<meta property="og:description" content="紙に描いた迷路を写真から読み取り、探索アルゴリズムが解く様子を可視化します。" />
+<meta property="og:type" content="website" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --paper:#FCFBF7; --paper-2:#F4F1E8; --ink:#2B303B; --ink-soft:#5A6472;
+    --rule:#C3D6E6; --rule-major:#A6C0D8; --green:#2B9348; --magenta:#C11574;
+    --amber:#F0A202; --teal:#4C8C8A; --line:#E4E0D3; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:radial-gradient(circle at 20% 0%, #fff 0%, var(--paper) 55%), var(--paper);color:var(--ink);
+    font-family:"Space Grotesk",system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    -webkit-font-smoothing:antialiased;min-height:100vh;}
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 60px;}
+  header.masthead{border-bottom:2px solid var(--ink);padding-bottom:14px;margin-bottom:22px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .title-block h1{font-size:clamp(26px,4.4vw,40px);font-weight:700;letter-spacing:-.02em;margin:0;line-height:1.02;}
+  .title-block .sub{margin-top:6px;color:var(--ink-soft);font-size:14px;max-width:58ch;line-height:1.5;}
+  .stamp{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);border:1.5px solid var(--ink-soft);border-radius:4px;padding:6px 10px;white-space:nowrap;transform:rotate(-1.5deg);}
+  .layout{display:grid;grid-template-columns:1fr 300px;gap:26px;align-items:start;}
+  @media (max-width:880px){.layout{grid-template-columns:1fr;}}
+  .board-frame{background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:12px;box-shadow:0 1px 0 #fff inset,0 10px 30px -18px rgba(43,48,59,.35);}
+  .board-panel{min-width:0;}
+  canvas{display:block;width:100%;height:auto;border-radius:4px;touch-action:none;}
+  #board{cursor:crosshair;}
+  .legend{display:flex;flex-wrap:wrap;gap:14px 18px;margin-top:14px;font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink-soft);}
+  .legend span{display:inline-flex;align-items:center;gap:7px;}
+  .swatch{width:13px;height:13px;border-radius:3px;border:1px solid rgba(43,48,59,.18);}
+  .panel{background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:16px 16px 18px;margin-bottom:16px;}
+  .panel h2{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin:0 0 12px;font-weight:600;font-family:"JetBrains Mono",monospace;display:flex;align-items:center;gap:8px;}
+  .panel h2::before{content:"";width:16px;height:2px;background:var(--ink);display:inline-block;}
+  .grid-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  button.chip{appearance:none;font-family:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--paper-2);border:1.5px solid var(--line);border-radius:7px;padding:9px 6px;cursor:pointer;transition:transform .08s,background .12s,border-color .12s,box-shadow .12s;display:flex;flex-direction:column;align-items:center;gap:3px;line-height:1.1;}
+  button.chip .k{font-size:16px;line-height:1;}
+  button.chip:hover{border-color:var(--ink-soft);}
+  button.chip:active{transform:translateY(1px);}
+  button.chip[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:0 4px 12px -6px rgba(43,48,59,.6);}
+  button.chip:focus-visible{outline:2.5px solid var(--amber);outline-offset:2px;}
+  .algo-list{display:flex;flex-direction:column;gap:8px;}
+  button.algo{appearance:none;font-family:inherit;text-align:left;cursor:pointer;background:var(--paper-2);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;transition:border-color .12s,background .12s;display:flex;flex-direction:column;gap:2px;color:var(--ink);}
+  button.algo .name{font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;}
+  button.algo .name .tag{font-family:"JetBrains Mono",monospace;font-size:10px;color:var(--ink-soft);letter-spacing:.05em;}
+  button.algo .desc{font-size:11.5px;color:var(--ink-soft);line-height:1.4;}
+  button.algo:hover{border-color:var(--ink-soft);}
+  button.algo[aria-pressed="true"]{border-color:var(--ink);background:#fff;box-shadow:inset 3px 0 0 var(--amber);}
+  button.algo:focus-visible{outline:2.5px solid var(--amber);outline-offset:2px;}
+  .row{display:flex;gap:8px;}
+  .row>*{flex:1;}
+  button.action{appearance:none;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;background:var(--paper-2);border:1.5px solid var(--line);border-radius:7px;padding:10px 8px;color:var(--ink);transition:border-color .12s,background .12s,transform .08s;}
+  button.action:hover{border-color:var(--ink-soft);}
+  button.action:active{transform:translateY(1px);}
+  button.action:focus-visible{outline:2.5px solid var(--amber);outline-offset:2px;}
+  button.action.wide{width:100%;margin-bottom:8px;}
+  button.solve{width:100%;appearance:none;font-family:inherit;font-size:15px;font-weight:700;background:var(--ink);color:var(--paper);border:none;border-radius:8px;padding:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:transform .08s,box-shadow .12s,opacity .12s;box-shadow:0 8px 20px -10px rgba(43,48,59,.8);}
+  button.solve:hover{box-shadow:0 10px 26px -10px rgba(43,48,59,.9);}
+  button.solve:active{transform:translateY(1px);}
+  button.solve:disabled{opacity:.5;cursor:default;}
+  button.solve .dot{width:9px;height:9px;border-radius:50%;background:var(--amber);}
+  .speed{margin-top:14px;}
+  .speed label{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-soft);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;margin-bottom:6px;}
+  input[type=range]{width:100%;accent-color:var(--ink);}
+  .sizes{display:flex;gap:8px;margin-top:12px;}
+  .sizes button{flex:1;}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1.5px solid var(--line);border-radius:8px;overflow:hidden;}
+  .stat{background:var(--paper);padding:12px 12px 11px;}
+  .stat .v{font-family:"JetBrains Mono",monospace;font-size:22px;font-weight:700;line-height:1;color:var(--ink);}
+  .stat .v.mut{color:var(--ink-soft);}
+  .stat .l{font-size:11px;color:var(--ink-soft);margin-top:5px;letter-spacing:.03em;}
+  .msg{margin-top:12px;font-size:13px;line-height:1.5;color:var(--ink-soft);min-height:1.2em;}
+  .msg.warn{color:var(--magenta);font-weight:500;}
+  footer{margin-top:34px;font-size:12px;color:var(--ink-soft);line-height:1.6;border-top:1px solid var(--line);padding-top:16px;}
+  code{font-family:"JetBrains Mono",monospace;background:var(--paper-2);padding:1px 5px;border-radius:4px;font-size:.92em;}
+  .modal[hidden]{display:none;}
+  .modal{position:fixed;inset:0;background:rgba(43,48,59,.6);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .modal-card{background:var(--paper);border-radius:12px;max-width:720px;width:100%;max-height:94vh;display:flex;flex-direction:column;border:1.5px solid var(--line);box-shadow:0 30px 80px -30px rgba(0,0,0,.55);overflow:hidden;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:15px 20px;border-bottom:1.5px solid var(--line);}
+  .modal-head h3{margin:0;font-size:17px;font-weight:700;}
+  .modal-head button{appearance:none;border:none;background:none;font-size:22px;cursor:pointer;color:var(--ink-soft);padding:2px 6px;border-radius:6px;}
+  .modal-head button:hover{background:var(--paper-2);color:var(--ink);}
+  .modal-body{padding:14px 20px;overflow:auto;}
+  .stage{background:var(--paper-2);border:1.5px dashed var(--line);border-radius:8px;padding:8px;}
+  #importCanvas{cursor:grab;}
+  .prev-head{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:14px 0 6px;}
+  #prevCanvas{background:#fff;border:1.5px solid var(--line);border-radius:6px;}
+  .imp-hint{font-size:12px;color:var(--ink-soft);margin:12px 2px 2px;line-height:1.55;}
+  .imp-ctrls{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:12px;}
+  .imp-ctrls .full{grid-column:1/-1;}
+  .imp-ctrls label{font-family:"JetBrains Mono",monospace;font-size:11px;color:var(--ink-soft);letter-spacing:.06em;text-transform:uppercase;display:flex;justify-content:space-between;margin-bottom:5px;}
+  .imp-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:0;font-family:inherit;}
+  .imp-check input{width:16px;height:16px;accent-color:var(--ink);}
+  .modal-foot{display:flex;gap:8px;padding:13px 20px;border-top:1.5px solid var(--line);}
+  .modal-foot .action{flex:1;}
+  .modal-foot .primary{flex:1.4;background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:700;}
+  .imp-warn{color:var(--magenta);font-size:12px;font-weight:500;margin-top:8px;min-height:1em;}
+  .status{font-size:12px;color:var(--ink-soft);margin-top:8px;font-family:"JetBrains Mono",monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <div class="title-block">
+      <h1>手描き迷路ソルバー</h1>
+      <p class="sub">紙に手描きした迷路を写真から取り込み、通れるマスを<b>ノード</b>・壁のない隣接を<b>辺</b>とするグラフに変換して、探索アルゴリズムが解いていく過程を可視化します。</p>
+    </div>
+    <div class="stamp">Photo&nbsp;→&nbsp;Graph&nbsp;→&nbsp;Path</div>
+  </header>
+  <div class="layout">
+    <section class="board-panel">
+      <div class="board-frame"><canvas id="board" aria-label="迷路盤面"></canvas></div>
+      <div class="legend" aria-hidden="true">
+        <span><i class="swatch" style="background:var(--green)"></i>スタート</span>
+        <span><i class="swatch" style="background:var(--magenta)"></i>ゴール</span>
+        <span><i class="swatch" style="background:var(--ink)"></i>壁</span>
+        <span><i class="swatch" style="background:var(--teal)"></i>探索済み（濃いほど後）</span>
+        <span><i class="swatch" style="background:var(--amber)"></i>最短経路</span>
+      </div>
+    </section>
+    <aside>
+      <div class="panel">
+        <h2>操作</h2>
+        <button class="action wide" id="importBtn">紙の写真から読み込む</button>
+        <button class="action wide" id="sheetBtn">方眼用紙を印刷する</button>
+        <div class="row" style="margin-bottom:8px;">
+          <button class="action" id="gen">迷路を自動生成</button>
+          <button class="action" id="clearWalls">壁を消去</button>
+        </div>
+        <button class="solve" id="solve"><span class="dot"></span>探索して解く</button>
+        <input type="file" id="file" accept="image/*" hidden />
+      </div>
+      <div class="panel">
+        <h2>アルゴリズム</h2>
+        <div class="algo-list" id="algos">
+          <button class="algo" data-algo="bfs" aria-pressed="true"><span class="name">幅優先探索 <span class="tag">BFS</span></span><span class="desc">波紋状に均等に広がり、最短の歩数を必ず見つける。</span></button>
+          <button class="algo" data-algo="dfs" aria-pressed="false"><span class="name">深さ優先探索 <span class="tag">DFS</span></span><span class="desc">行けるところまで潜る。速いが最短とは限らない。</span></button>
+          <button class="algo" data-algo="dijkstra" aria-pressed="false"><span class="name">ダイクストラ法 <span class="tag">DIJKSTRA</span></span><span class="desc">優先度付きキューで近い順に確定。最短を保証。</span></button>
+          <button class="algo" data-algo="astar" aria-pressed="false"><span class="name">A* 探索 <span class="tag">A-STAR</span></span><span class="desc">ゴール方向を推定し、無駄な探索を減らす。</span></button>
+        </div>
+        <div class="speed"><label>探索スピード <span id="speedVal">標準</span></label><input type="range" id="speed" min="1" max="6" value="3" /></div>
+      </div>
+      <div class="panel">
+        <h2>ペン（修正用）</h2>
+        <div class="grid-btns" id="tools">
+          <button class="chip" data-tool="wall" aria-pressed="true"><span class="k">▓</span>壁を足す</button>
+          <button class="chip" data-tool="erase" aria-pressed="false"><span class="k">◻</span>壁を消す</button>
+          <button class="chip" data-tool="start" aria-pressed="false"><span class="k" style="color:var(--green)">◉</span>スタート</button>
+          <button class="chip" data-tool="end" aria-pressed="false"><span class="k" style="color:var(--magenta)">◎</span>ゴール</button>
+        </div>
+        <div class="sizes" id="sizes">
+          <button class="action" data-size="small">21×15</button>
+          <button class="action" data-size="medium">31×21</button>
+          <button class="action" data-size="large">41×27</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>結果</h2>
+        <div class="stats">
+          <div class="stat"><div class="v mut" id="stVisited">—</div><div class="l">探索したマス</div></div>
+          <div class="stat"><div class="v mut" id="stLength">—</div><div class="l">経路の歩数</div></div>
+          <div class="stat"><div class="v mut" id="stEff">—</div><div class="l">探索効率</div></div>
+          <div class="stat"><div class="v mut" id="stAlgo">—</div><div class="l">アルゴリズム</div></div>
+        </div>
+        <div class="msg" id="msg">写真を読み込むか、迷路を自動生成して「探索して解く」を押してください。</div>
+      </div>
+    </aside>
+  </div>
+  <footer><b>仕組み：</b> 写真の各画素が周囲の紙面よりどれだけ暗いか（局所コントラスト）を求め、方眼の罫線が作る周期をフーリエ解析で読み取ってマス数を自動決定します。次に四隅の射影変換で正面化し、<b>マス境界ごとにインク量を積分</b>して大津の方法でしきい値を自動決定。塗った壁は罫線よりインク量が桁違いに大きいため、5マスごとの太い罫線とも確実に区別できます。得られた壁を <code>(2R+1)×(2C+1)</code> の格子グラフに展開し、BFS/DFS はキューとスタック、ダイクストラと A* は二分ヒープで探索します。</footer>
+</div>
+<div class="modal" id="importModal" hidden>
+  <div class="modal-card">
+    <div class="modal-head"><h3>紙の迷路を読み込む</h3><button id="impClose" aria-label="閉じる">&times;</button></div>
+    <div class="modal-body">
+      <div class="stage"><canvas id="importCanvas"></canvas></div>
+      <div class="row" style="margin-top:10px;">
+        <button class="action" id="impAuto">自動で合わせる</button>
+        <button class="action" id="impFit">マス数だけ再推定</button>
+      </div>
+      <div class="status" id="impStatus">画像を解析しています…</div>
+      <div class="prev-head">各マス境界のインク量（明るいほど濃く塗られている）</div>
+      <div class="stage"><canvas id="prevCanvas"></canvas></div>
+      <div class="imp-ctrls">
+        <div><label>横のマス数<span id="colVal">21</span></label><input type="range" id="impCols" min="2" max="45" value="21" /></div>
+        <div><label>縦のマス数<span id="rowVal">15</span></label><input type="range" id="impRows" min="2" max="45" value="15" /></div>
+        <div class="full"><label>壁と判定する濃さ<span id="thVal">100%</span></label><input type="range" id="impTh" min="50" max="180" value="100" /></div>
+        <label class="imp-check full"><input type="checkbox" id="impInvert" />白い線・黒い紙の迷路を反転して読む</label>
+      </div>
+      <p class="imp-hint">青い格子が方眼のマス目に、マゼンタが塗った壁に重なればOKです。マス目の線を塗って描いた迷路を想定しています。ズレていれば<b>オレンジの四隅</b>を迷路の角へドラッグし、マス数を調整してください。細い罫線まで拾ってしまうときは「壁と判定する濃さ」を上げます。</p>
+      <div class="imp-warn" id="impWarn"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="action" id="impRepick">別の写真</button>
+      <button class="action" id="impCancel">キャンセル</button>
+      <button class="action primary" id="impApply">この迷路を使う</button>
+    </div>
+  </div>
+</div>
+<script type="text/plain" id="gridSheet">
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>21×15 マス目（手描き迷路用）</title>
+<style>
+  :root{ --paper:#FCFBF7; --ink:#2B303B; --rule:#C3D6E6; --rule-major:#9DBAD2; --soft:#5A6472; }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#EDEBE3;}
+  body{font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;color:var(--ink);}
+  .screen{max-width:900px;margin:0 auto;padding:24px 20px 48px;}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:18px;flex-wrap:wrap;}
+  .bar h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em;}
+  .bar p{margin:4px 0 0;font-size:13px;color:var(--soft);line-height:1.5;max-width:60ch;}
+  .print-btn{appearance:none;border:none;background:var(--ink);color:#fff;font-family:inherit;font-size:14px;font-weight:600;padding:11px 18px;border-radius:8px;cursor:pointer;white-space:nowrap;}
+  .print-btn:hover{box-shadow:0 8px 20px -10px rgba(43,48,59,.7);}
+  .sheet{background:var(--paper);border-radius:8px;padding:26px;box-shadow:0 12px 40px -18px rgba(43,48,59,.5);}
+  svg{display:block;width:100%;height:auto;}
+  .tip{margin-top:14px;font-size:12px;color:var(--soft);line-height:1.6;}
+  .tip b{color:var(--ink);}
+
+  @media print{
+    html,body{background:#fff;}
+    .screen{max-width:none;padding:0;margin:0;}
+    .bar,.tip{display:none !important;}
+    .sheet{box-shadow:none;border-radius:0;padding:0;}
+    @page{ size:A4 portrait; margin:14mm; }
+  }
+</style>
+</head>
+<body>
+  <div class="screen">
+    <div class="bar">
+      <div>
+        <h1>21 × 15 マス目</h1>
+        <p>印刷して手描きで迷路を描き、写真に撮って「紙の写真から読み込む」で取り込むための白紙グリッドです。壁はマスの境界線に沿って描き、取り込みは「線で描いた壁」モード・列 21・行 15 を指定してください。</p>
+      </div>
+      <button class="print-btn" onclick="window.print()">印刷</button>
+    </div>
+
+    <div class="sheet">
+      <!-- 21 columns x 15 rows, square cells of 40 units. Border + corner marks + major lines every 5. -->
+      <svg viewBox="-26 -26 892 652" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+        <!-- minor grid lines -->
+        <g stroke="#C3D6E6" stroke-width="1">
+          <!-- verticals -->
+          <line x1="0"   y1="0" x2="0"   y2="600"/><line x1="40"  y1="0" x2="40"  y2="600"/><line x1="80"  y1="0" x2="80"  y2="600"/><line x1="120" y1="0" x2="120" y2="600"/><line x1="160" y1="0" x2="160" y2="600"/>
+          <line x1="200" y1="0" x2="200" y2="600"/><line x1="240" y1="0" x2="240" y2="600"/><line x1="280" y1="0" x2="280" y2="600"/><line x1="320" y1="0" x2="320" y2="600"/><line x1="360" y1="0" x2="360" y2="600"/>
+          <line x1="400" y1="0" x2="400" y2="600"/><line x1="440" y1="0" x2="440" y2="600"/><line x1="480" y1="0" x2="480" y2="600"/><line x1="520" y1="0" x2="520" y2="600"/><line x1="560" y1="0" x2="560" y2="600"/>
+          <line x1="600" y1="0" x2="600" y2="600"/><line x1="640" y1="0" x2="640" y2="600"/><line x1="680" y1="0" x2="680" y2="600"/><line x1="720" y1="0" x2="720" y2="600"/><line x1="760" y1="0" x2="760" y2="600"/>
+          <line x1="800" y1="0" x2="800" y2="600"/><line x1="840" y1="0" x2="840" y2="600"/>
+          <!-- horizontals -->
+          <line x1="0" y1="0"   x2="840" y2="0"/><line x1="0" y1="40"  x2="840" y2="40"/><line x1="0" y1="80"  x2="840" y2="80"/><line x1="0" y1="120" x2="840" y2="120"/><line x1="0" y1="160" x2="840" y2="160"/>
+          <line x1="0" y1="200" x2="840" y2="200"/><line x1="0" y1="240" x2="840" y2="240"/><line x1="0" y1="280" x2="840" y2="280"/><line x1="0" y1="320" x2="840" y2="320"/><line x1="0" y1="360" x2="840" y2="360"/>
+          <line x1="0" y1="400" x2="840" y2="400"/><line x1="0" y1="440" x2="840" y2="440"/><line x1="0" y1="480" x2="840" y2="480"/><line x1="0" y1="520" x2="840" y2="520"/><line x1="0" y1="560" x2="840" y2="560"/>
+          <line x1="0" y1="600" x2="840" y2="600"/>
+        </g>
+        <!-- major lines every 5 cells -->
+        <g stroke="#9DBAD2" stroke-width="1.6">
+          <line x1="200" y1="0" x2="200" y2="600"/><line x1="400" y1="0" x2="400" y2="600"/><line x1="600" y1="0" x2="600" y2="600"/><line x1="800" y1="0" x2="800" y2="600"/>
+          <line x1="0" y1="200" x2="840" y2="200"/><line x1="0" y1="400" x2="840" y2="400"/>
+        </g>
+        <!-- bold outer border (alignment target for import) -->
+        <rect x="0" y="0" width="840" height="600" fill="none" stroke="#2B303B" stroke-width="4"/>
+        <!-- corner registration marks -->
+        <g fill="#2B303B">
+          <rect x="-9" y="-9" width="18" height="18"/>
+          <rect x="831" y="-9" width="18" height="18"/>
+          <rect x="831" y="591" width="18" height="18"/>
+          <rect x="-9" y="591" width="18" height="18"/>
+        </g>
+      </svg>
+    </div>
+
+    <p class="tip"><b>使い方：</b> ① このページを印刷 → ② マスの境界線をなぞるように壁を描く（濃い鉛筆・サインペン推奨） → ③ 明るい場所で正面から撮影 → ④ アプリの「紙の写真から読み込む」で四隅の■マークに合わせ、<b>線で描いた壁</b>／<b>列 21・行 15</b> で読み込み。</p>
+  </div>
+</body>
+</html>
+
+</script>
+<script>
+(() => {
+"use strict";
+
+// ===== CV3-START =====
+function toGray(px,W,H){ const g=new Float32Array(W*H);
+  for(let i=0,j=0;i<W*H;i++,j+=4) g[i]=0.299*px[j]+0.587*px[j+1]+0.114*px[j+2]; return g; }
+function boxBlur(src,W,H,r){
+  const t=new Float32Array(W*H), o=new Float32Array(W*H), k=2*r+1;
+  for(let y=0;y<H;y++){ const row=y*W; let acc=0;
+    for(let x=-r;x<=r;x++) acc+=src[row+Math.min(W-1,Math.max(0,x))];
+    for(let x=0;x<W;x++){ t[row+x]=acc/k;
+      acc-=src[row+Math.min(W-1,Math.max(0,x-r))]; acc+=src[row+Math.min(W-1,Math.max(0,x+r+1))]; } }
+  for(let x=0;x<W;x++){ let acc=0;
+    for(let y=-r;y<=r;y++) acc+=t[Math.min(H-1,Math.max(0,y))*W+x];
+    for(let y=0;y<H;y++){ o[y*W+x]=acc/k;
+      acc-=t[Math.min(H-1,Math.max(0,y-r))*W+x]; acc+=t[Math.min(H-1,Math.max(0,y+r+1))*W+x]; } }
+  return o;
+}
+// "ink" = how much darker than the local paper background (robust to shadows)
+function inkImage(px,W,H,bgRad,invert){
+  const g=toGray(px,W,H), bg=boxBlur(g,W,H,bgRad), o=new Float32Array(W*H);
+  for(let i=0;i<W*H;i++){ const v=invert? g[i]-bg[i] : bg[i]-g[i]; o[i]=v>0?v:0; }
+  return o;
+}
+function homography(cn){
+  const [p0,p1,p2,p3]=cn;
+  const sx=p0.x-p1.x+p2.x-p3.x, sy=p0.y-p1.y+p2.y-p3.y;
+  const dx1=p1.x-p2.x, dx2=p3.x-p2.x, dy1=p1.y-p2.y, dy2=p3.y-p2.y;
+  const den=dx1*dy2-dy1*dx2; let g=0,h=0;
+  if(Math.abs(den)>1e-9){ g=(sx*dy2-sy*dx2)/den; h=(dx1*sy-dy1*sx)/den; }
+  const a=p1.x-p0.x+g*p1.x, b=p3.x-p0.x+h*p3.x, c=p0.x;
+  const d=p1.y-p0.y+g*p1.y, e=p3.y-p0.y+h*p3.y, f=p0.y;
+  return (u,v)=>{ const w=g*u+h*v+1; return {x:(a*u+b*v+c)/w, y:(d*u+e*v+f)/w}; };
+}
+const sampleInk=(ink,W,H,x,y)=>{ x=x|0;y=y|0; return (x<0||y<0||x>=W||y>=H)?0:ink[y*W+x]; };
+
+// Pitch of a periodic line pattern; prefers the fundamental over its harmonics
+function fitPitch(prof,lo,hi){
+  const n=prof.length; let tot=0;
+  for(let i=0;i<n;i++) tot+=prof[i];
+  if(tot<=0) return null;
+  const score=p=>{ let re=0,im=0;
+    for(let i=0;i<n;i++){ const a=2*Math.PI*i/p; re+=prof[i]*Math.cos(a); im+=prof[i]*Math.sin(a); }
+    return Math.hypot(re,im)/tot; };
+  let bp=lo,bs=-1;
+  for(let p=lo;p<=hi;p+=0.5){ const s=score(p); if(s>bs){bs=s;bp=p;} }
+  for(let p=Math.max(lo,bp-0.6);p<=Math.min(hi,bp+0.6);p+=0.05){ const s=score(p); if(s>bs){bs=s;bp=p;} }
+  let P=bp;
+  for(let k=2;k<=5;k++){ const q=bp*k; if(q<=hi && score(q)>=0.85*bs) P=q; }
+  return {pitch:P,strength:bs};
+}
+// Read the grid period straight off the paper's own ruling
+function autoGrid(ink,W,H,cn,maxCells){
+  const RW=760, RH=Math.max(80,Math.round(760*Math.hypot(cn[3].x-cn[0].x,cn[3].y-cn[0].y)/Math.max(1,Math.hypot(cn[1].x-cn[0].x,cn[1].y-cn[0].y))));
+  const P=homography(cn);
+  const Px=new Float32Array(RW), Py=new Float32Array(RH);
+  const st=2;                                   // stride: profiles stay sharp, cost drops 4x
+  for(let ry=0;ry<RH;ry+=st) for(let rx=0;rx<RW;rx+=st){
+    const p=P((rx+0.5)/RW,(ry+0.5)/RH); const v=sampleInk(ink,W,H,p.x,p.y);
+    Px[rx]+=v; Py[ry]+=v;
+  }
+  const lox=RW/maxCells, loy=RH/maxCells;
+  const fx=fitPitch(Px,Math.max(6,lox),RW/2), fy=fitPitch(Py,Math.max(6,loy),RH/2);
+  const cols=fx?Math.max(2,Math.min(maxCells,Math.round(RW/fx.pitch))):null;
+  const rows=fy?Math.max(2,Math.min(maxCells,Math.round(RH/fy.pitch))):null;
+  return {cols,rows,strengthX:fx?fx.strength:0,strengthY:fy?fy.strength:0};
+}
+// Integrated ink across each grid edge: a drawn wall carries far more than a printed rule
+function edgeMasses(ink,W,H,cn,cols,rows,opt){
+  const P=homography(cn);
+  const cellPx=Math.hypot(cn[1].x-cn[0].x,cn[1].y-cn[0].y)/cols;
+  const band=Math.max(2,Math.round((opt.bandFrac||0.25)*cellPx));
+  const N=opt.samples||14;
+  const med=a=>{ a=a.slice().sort((x,y)=>x-y); const m=a.length>>1;
+    return a.length%2?a[m]:(a[m-1]+a[m])/2; };
+  const line=(p0,p1,axis)=>{ const vals=[];
+    for(let k=0;k<N;k++){ const t=0.15+0.7*k/(N-1);
+      const x=p0.x+(p1.x-p0.x)*t, y=p0.y+(p1.y-p0.y)*t; let s=0;
+      for(let d=-band;d<=band;d++) s+= axis==='v'? sampleInk(ink,W,H,x+d,y) : sampleInk(ink,W,H,x,y+d);
+      vals.push(s); }
+    return med(vals); };
+  const V=[],Hh=[];
+  for(let r=0;r<rows;r++){ const row=[];
+    for(let c=0;c<=cols;c++) row.push(line(P(c/cols,r/rows),P(c/cols,(r+1)/rows),'v'));
+    V.push(row); }
+  for(let r=0;r<=rows;r++){ const row=[];
+    for(let c=0;c<cols;c++) row.push(line(P(c/cols,r/rows),P((c+1)/cols,r/rows),'h'));
+    Hh.push(row); }
+  return {V,Hh,band};
+}
+function otsu(vals,bins){
+  bins=bins||128;
+  let mn=Infinity,mx=-Infinity;
+  for(const v of vals){ if(v<mn)mn=v; if(v>mx)mx=v; }
+  if(!(mx>mn)) return mx;
+  const h=new Float64Array(bins);
+  for(const v of vals) h[Math.min(bins-1,Math.floor((v-mn)/(mx-mn)*bins))]++;
+  const n=vals.length; let w=0,mu=0,muT=0;
+  for(let i=0;i<bins;i++) muT+=h[i]/n*(mn+(i+0.5)/bins*(mx-mn));
+  let best=-1,bt=mn;
+  for(let i=0;i<bins;i++){
+    w+=h[i]/n; if(w<=0||w>=1) continue;
+    mu+=h[i]/n*(mn+(i+0.5)/bins*(mx-mn));
+    const sb=Math.pow(muT*w-mu,2)/(w*(1-w));
+    if(sb>best){ best=sb; bt=mn+(i+1)/bins*(mx-mn); }
+  }
+  return bt;
+}
+// Classify every grid edge as wall / not, thresholding the mass distribution
+function detectWalls(ink,W,H,cn,cols,rows,opt){
+  const m=edgeMasses(ink,W,H,cn,cols,rows,opt);
+  const all=[]; m.V.forEach(r=>r.forEach(v=>all.push(v))); m.Hh.forEach(r=>r.forEach(v=>all.push(v)));
+  let th=otsu(all)*(opt.thScale||1);
+  const vwall=m.V.map(r=>r.map(v=>v>th?1:0));
+  const hwall=m.Hh.map(r=>r.map(v=>v>th?1:0));
+  let n=0; vwall.forEach(r=>r.forEach(v=>n+=v)); hwall.forEach(r=>r.forEach(v=>n+=v));
+  return {vwall,hwall,threshold:th,masses:m,count:n};
+}
+// ===== CV3-END =====
+
+// --- helpers used only by the corner-mark detector ---
+function lumPx(px,iw,ih,x,y){
+  x=x|0; y=y|0;
+  if(x<0)x=0; if(y<0)y=0; if(x>=iw)x=iw-1; if(y>=ih)y=ih-1;
+  const i=(y*iw+x)*4;
+  return 0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];
+}
+function runsH(m,W,H){ const r=new Int32Array(W*H);
+  for(let y=0;y<H;y++){ let x=0; const row=y*W;
+    while(x<W){ if(!m[row+x]){x++;continue;} const s=x; while(x<W&&m[row+x])x++;
+      for(let k=s;k<x;k++) r[row+k]=x-s; } }
+  return r;
+}
+function runsV(m,W,H){ const r=new Int32Array(W*H);
+  for(let x=0;x<W;x++){ let y=0;
+    while(y<H){ if(!m[y*W+x]){y++;continue;} const s=y; while(y<H&&m[y*W+x])y++;
+      for(let k=s;k<y;k++) r[k*W+x]=y-s; } }
+  return r;
+}
+function thicknessFilter(m,W,H,minThick){
+  const rh=runsH(m,W,H), rv=runsV(m,W,H), out=new Uint8Array(W*H);
+  for(let i=0;i<W*H;i++) out[i]=(m[i]&&Math.min(rh[i],rv[i])>=minThick)?1:0;
+  return out;
+}
+
+function findCornerMarks(px,iw,ih){
+  const TW=Math.min(520,iw), sc=TW/iw, TH=Math.max(1,Math.round(ih*sc));
+  const g=new Float32Array(TW*TH);
+  for(let y=0;y<TH;y++) for(let x=0;x<TW;x++) g[y*TW+x]=lumPx(px,iw,ih,x/sc,y/sc);
+  const hist=new Array(256).fill(0);
+  for(let i=0;i<g.length;i++) hist[Math.max(0,Math.min(255,g[i]|0))]++;
+  let acc=0, th=0, target=g.length*0.04;
+  for(let v=0;v<256;v++){ acc+=hist[v]; if(acc>=target){ th=v; break; } }
+  th=Math.max(th,30);
+  const m=new Uint8Array(TW*TH);
+  for(let i=0;i<g.length;i++) m[i]=g[i]<=th?1:0;
+  const solid=thicknessFilter(m,TW,TH,Math.max(3,Math.round(TW*0.011)));
+  // connected components
+  const lab=new Int32Array(TW*TH).fill(-1); const comps=[];
+  for(let i=0;i<solid.length;i++){
+    if(!solid[i]||lab[i]>=0) continue;
+    const id=comps.length; const st=[i]; lab[i]=id;
+    let n=0,sx=0,sy=0,x0=1e9,x1=-1,y0=1e9,y1=-1;
+    while(st.length){
+      const p=st.pop(), x=p%TW, y=(p/TW)|0;
+      n++; sx+=x; sy+=y;
+      if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y;
+      for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++){
+        const nx=x+dx, ny=y+dy;
+        if(nx<0||ny<0||nx>=TW||ny>=TH) continue;
+        const q=ny*TW+nx;
+        if(solid[q]&&lab[q]<0){ lab[q]=id; st.push(q); }
+      }
+    }
+    comps.push({n,cx:sx/n,cy:sy/n,bw:x1-x0+1,bh:y1-y0+1});
+  }
+  const exp=Math.pow(TW*0.019,2);
+  const cand=comps.filter(c=>{
+    if(c.n<exp*0.12||c.n>exp*6) return false;
+    const ar=c.bw/c.bh; if(ar<0.5||ar>2.0) return false;
+    return c.n/(c.bw*c.bh)>0.55;
+  });
+  if(cand.length<3) return null;
+  const anchors=[[0,0],[TW,0],[TW,TH],[0,TH]];
+  const out=[], used=new Set();
+  for(const [ax,ay] of anchors){
+    let best=null,bd=Infinity;
+    for(let i=0;i<cand.length;i++){
+      if(used.has(i)) continue;
+      const c=cand[i], d=Math.hypot(c.cx-ax,c.cy-ay);
+      if(d<bd){ bd=d; best=i; }
+    }
+    if(best===null||bd>Math.hypot(TW,TH)*0.42){ out.push(null); continue; }
+    used.add(best);
+    out.push({x:cand[best].cx/sc, y:cand[best].cy/sc});
+  }
+  const miss=out.filter(p=>!p).length;
+  if(miss>1) return null;
+  if(miss===1){ // infer the cropped corner from the other three (parallelogram)
+    const i=out.indexOf(null), a=out[(i+1)%4], b=out[(i+2)%4], c=out[(i+3)%4];
+    out[i]={x:a.x-b.x+c.x, y:a.y-b.y+c.y};
+  }
+  return out;
+}
+
+// ===== CV2-START =====
+// ================= board model =================
+const EMPTY=0, WALL=1;
+const SIZES={ small:[15,21], medium:[21,31], large:[27,41] };
+const CO={ paper:"#FCFBF7", rule:"#C3D6E6", ruleMajor:"#A6C0D8", ink:"#2B303B",
+  green:"#2B9348", magenta:"#C11574", amber:"#F0A202", visitLo:[226,241,239], visitHi:[54,120,116] };
+const SPEED_MAP={1:2,2:5,3:11,4:22,5:45,6:120};
+const SPEED_LABEL={1:"じっくり",2:"ゆっくり",3:"標準",4:"はやい",5:"高速",6:"一気に"};
+
+let rows,cols,grid,start,end;
+let thin=false;                 // thin-wall rendering (imported mazes)
+let LX=[],LY=[],SX=[],SY=[];
+let dprv=Math.max(1,window.devicePixelRatio||1);
+let tool="wall", algo="bfs", painting=false, anim=null, rafId=null, currentSize="small";
+const reduce=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const el=id=>document.getElementById(id);
+const canvas=el("board"), ctx=canvas.getContext("2d");
+
+function newGrid(key){
+  [rows,cols]=SIZES[key]; thin=false;
+  grid=Array.from({length:rows},()=>new Array(cols).fill(EMPTY));
+  for(let c=0;c<cols;c++){grid[0][c]=WALL;grid[rows-1][c]=WALL;}
+  for(let r=0;r<rows;r++){grid[r][0]=WALL;grid[r][cols-1]=WALL;}
+  start=[1,1]; end=[rows-2,cols-2]; clearSolution();
+}
+
+function computeLayout(avail){
+  if(!thin){
+    const cell=Math.max(4,Math.floor(avail/cols));
+    SX=new Array(cols).fill(cell); SY=new Array(rows).fill(cell);
+  } else {
+    const C=(cols-1)/2;
+    let room=Math.max(7,Math.floor(avail/(C+ (C+1)*0.22)));
+    let wall=Math.max(2,Math.round(room*0.22));
+    room=Math.max(7,Math.floor((avail-(C+1)*wall)/C));
+    SX=[]; for(let i=0;i<cols;i++) SX.push(i%2===0?wall:room);
+    SY=[]; for(let i=0;i<rows;i++) SY.push(i%2===0?wall:room);
+  }
+  LX=[0]; for(let i=0;i<cols;i++) LX.push(LX[i]+SX[i]);
+  LY=[0]; for(let i=0;i<rows;i++) LY.push(LY[i]+SY[i]);
+}
+function resize(){
+  computeLayout(canvas.parentElement.clientWidth-24);
+  const w=LX[cols], h=LY[rows];
+  canvas.style.width=w+"px"; canvas.style.height=h+"px";
+  canvas.width=Math.round(w*dprv); canvas.height=Math.round(h*dprv);
+  ctx.setTransform(dprv,0,0,dprv,0,0); draw();
+}
+const isRoom=(r,c)=> !thin || (r%2===1&&c%2===1);
+const lerp=(a,b,t)=>`rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;
+const cx=c=>LX[c]+SX[c]/2, cyf=r=>LY[r]+SY[r]/2;
+
+function draw(){
+  const w=LX[cols],h=LY[rows];
+  ctx.clearRect(0,0,w,h); ctx.fillStyle=CO.paper; ctx.fillRect(0,0,w,h);
+  const rev=anim?anim.revealCount:0;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const x=LX[c],y=LY[r],sw=SX[c],sh=SY[r];
+    if(grid[r][c]===WALL){ ctx.fillStyle=CO.ink; ctx.fillRect(x,y,sw,sh); continue; }
+    if(anim){ const i=anim.orderMap[r*cols+c];
+      if(i!==undefined&&i<rev){ ctx.fillStyle=lerp(CO.visitLo,CO.visitHi,anim.maxOrder>0?i/anim.maxOrder:0);
+        ctx.globalAlpha=.9; ctx.fillRect(x,y,sw,sh); ctx.globalAlpha=1; } }
+  }
+  if(!thin){
+    ctx.lineWidth=1;
+    for(let c=0;c<=cols;c++){ ctx.beginPath(); ctx.strokeStyle=(c%5===0)?CO.ruleMajor:CO.rule; ctx.moveTo(LX[c]+.5,0); ctx.lineTo(LX[c]+.5,h); ctx.stroke(); }
+    for(let r=0;r<=rows;r++){ ctx.beginPath(); ctx.strokeStyle=(r%5===0)?CO.ruleMajor:CO.rule; ctx.moveTo(0,LY[r]+.5); ctx.lineTo(w,LY[r]+.5); ctx.stroke(); }
+  } else {
+    ctx.strokeStyle="rgba(195,214,230,.55)"; ctx.lineWidth=1;
+    for(let c=1;c<cols;c+=2){ ctx.beginPath(); ctx.moveTo(LX[c]+.5,0); ctx.lineTo(LX[c]+.5,h); ctx.stroke(); }
+    for(let r=1;r<rows;r+=2){ ctx.beginPath(); ctx.moveTo(0,LY[r]+.5); ctx.lineTo(w,LY[r]+.5); ctx.stroke(); }
+  }
+  if(anim&&anim.pathCount>0&&anim.path.length){
+    const n=Math.min(anim.pathCount,anim.path.length);
+    ctx.fillStyle="rgba(240,162,2,.28)";
+    for(let i=0;i<n;i++){ const [r,c]=anim.path[i]; ctx.fillRect(LX[c],LY[r],SX[c],SY[r]); }
+    if(n>1){ ctx.strokeStyle=CO.amber; ctx.lineWidth=Math.max(2.5,Math.min(SX[1],SY[1])*0.3);
+      ctx.lineJoin="round"; ctx.lineCap="round"; ctx.beginPath();
+      for(let i=0;i<n;i++){ const [r,c]=anim.path[i]; i===0?ctx.moveTo(cx(c),cyf(r)):ctx.lineTo(cx(c),cyf(r)); }
+      ctx.stroke(); }
+  }
+  marker(start,CO.green,false); marker(end,CO.magenta,true);
+}
+function marker([r,c],color,ring){
+  const x=LX[c],y=LY[r],sw=SX[c],sh=SY[r],px=cx(c),py=cyf(r),rad=Math.min(sw,sh)*.32;
+  ctx.fillStyle=color; rr(x+sw*.16,y+sh*.16,sw*.68,sh*.68,Math.max(2,Math.min(sw,sh)*.18)); ctx.fill();
+  if(ring){ ctx.strokeStyle=CO.paper; ctx.lineWidth=Math.max(1.5,rad*.4); ctx.beginPath(); ctx.arc(px,py,rad*.6,0,7); ctx.stroke(); }
+  else { ctx.fillStyle=CO.paper; ctx.beginPath(); ctx.arc(px,py,rad*.45,0,7); ctx.fill(); }
+}
+function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+function hitCell(e){
+  const b=canvas.getBoundingClientRect();
+  const px=(e.clientX-b.left)*(LX[cols]/b.width), py=(e.clientY-b.top)*(LY[rows]/b.height);
+  let c=0,r=0;
+  while(c<cols-1&&px>=LX[c+1])c++;
+  while(r<rows-1&&py>=LY[r+1])r++;
+  return [r,c];
+}
+function nearestRoom(r,c){
+  if(!thin) return [r,c];
+  let rr2=r%2===1?r:Math.max(1,Math.min(rows-2,r+(r===0?1:-1)));
+  let cc=c%2===1?c:Math.max(1,Math.min(cols-2,c+(c===0?1:-1)));
+  return [rr2,cc];
+}
+function applyTool(r,c){
+  if(r<=0||c<=0||r>=rows-1||c>=cols-1) return;
+  if(tool==="start"||tool==="end"){
+    const [pr,pc]=nearestRoom(r,c);
+    if(grid[pr][pc]===WALL) return;
+    if(tool==="start"){ if(pr===end[0]&&pc===end[1])return; start=[pr,pc]; }
+    else { if(pr===start[0]&&pc===start[1])return; end=[pr,pc]; }
+    clearSolution(); draw(); return;
+  }
+  if(thin){
+    if(r%2===1&&c%2===1) return;          // rooms stay open
+    if(r%2===0&&c%2===0) return;          // pillars stay walls
+  }
+  if((r===start[0]&&c===start[1])||(r===end[0]&&c===end[1])) return;
+  const v=tool==="wall"?WALL:EMPTY;
+  if(grid[r][c]!==v){ grid[r][c]=v; clearSolution(); draw(); }
+}
+canvas.addEventListener("pointerdown",e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);stopAnim();painting=true;const[r,c]=hitCell(e);applyTool(r,c);});
+canvas.addEventListener("pointermove",e=>{if(!painting)return;const[r,c]=hitCell(e);applyTool(r,c);});
+["pointerup","pointercancel","pointerleave"].forEach(ev=>canvas.addEventListener(ev,()=>{painting=false;}));
+
+// ================= graph search =================
+function clearSolution(){ stopAnim(); anim=null; setStats(null); }
+function stopAnim(){ if(rafId){cancelAnimationFrame(rafId);rafId=null;} }
+const DIRS=[[-1,0],[1,0],[0,-1],[0,1]];
+const walk=(r,c)=>grid[r][c]!==WALL;
+const gi=(r,c)=>r*cols+c;
+class Heap{constructor(){this.a=[];}get size(){return this.a.length;}
+  push(p,v){const a=this.a;a.push({p,v});let i=a.length-1;while(i>0){const q=(i-1)>>1;if(a[q].p<=a[i].p)break;[a[q],a[i]]=[a[i],a[q]];i=q;}}
+  pop(){const a=this.a,t=a[0],l=a.pop();if(a.length){a[0]=l;let i=0;for(;;){const x=2*i+1,y=2*i+2;let s=i;if(x<a.length&&a[x].p<a[s].p)s=x;if(y<a.length&&a[y].p<a[s].p)s=y;if(s===i)break;[a[s],a[i]]=[a[i],a[s]];i=s;}}return t.v;}}
+function rebuild(par,s,e){const p=[];let cur=gi(e[0],e[1]);const si=gi(s[0],s[1]);
+  if(par[cur]===undefined&&cur!==si)return[];
+  while(cur!==undefined){p.push([Math.floor(cur/cols),cur%cols]);if(cur===si)break;cur=par[cur];}return p.reverse();}
+function sBFS(){const o=[],par={},seen=new Uint8Array(rows*cols),q=[start];seen[gi(start[0],start[1])]=1;let hd=0;
+  while(hd<q.length){const[r,c]=q[hd++];o.push([r,c]);if(r===end[0]&&c===end[1])break;
+    for(const[dr,dc]of DIRS){const nr=r+dr,nc=c+dc;if(nr<0||nc<0||nr>=rows||nc>=cols)continue;if(!walk(nr,nc)||seen[gi(nr,nc)])continue;seen[gi(nr,nc)]=1;par[gi(nr,nc)]=gi(r,c);q.push([nr,nc]);}}
+  const p=rebuild(par,start,end);return{o,p,f:p.length>0};}
+function sDFS(){const o=[],par={},seen=new Uint8Array(rows*cols),st=[start];let f=false;
+  while(st.length){const[r,c]=st.pop(),id=gi(r,c);if(seen[id])continue;seen[id]=1;o.push([r,c]);
+    if(r===end[0]&&c===end[1]){f=true;break;}
+    for(const[dr,dc]of DIRS){const nr=r+dr,nc=c+dc;if(nr<0||nc<0||nr>=rows||nc>=cols)continue;if(!walk(nr,nc)||seen[gi(nr,nc)])continue;if(par[gi(nr,nc)]===undefined)par[gi(nr,nc)]=id;st.push([nr,nc]);}}
+  const p=f?rebuild(par,start,end):[];return{o,p,f};}
+function sDij(){const o=[],par={},d=new Float64Array(rows*cols).fill(Infinity),dn=new Uint8Array(rows*cols),h=new Heap();
+  d[gi(start[0],start[1])]=0;h.push(0,start);
+  while(h.size){const[r,c]=h.pop(),id=gi(r,c);if(dn[id])continue;dn[id]=1;o.push([r,c]);if(r===end[0]&&c===end[1])break;
+    for(const[dr,dc]of DIRS){const nr=r+dr,nc=c+dc;if(nr<0||nc<0||nr>=rows||nc>=cols)continue;if(!walk(nr,nc))continue;const ni=gi(nr,nc),nd=d[id]+1;if(nd<d[ni]){d[ni]=nd;par[ni]=id;h.push(nd,[nr,nc]);}}}
+  const p=rebuild(par,start,end);return{o,p,f:p.length>0};}
+function sAStar(){const o=[],par={},g=new Float64Array(rows*cols).fill(Infinity),dn=new Uint8Array(rows*cols),h=new Heap();
+  const Hf=(r,c)=>Math.abs(r-end[0])+Math.abs(c-end[1]);
+  g[gi(start[0],start[1])]=0;h.push(Hf(start[0],start[1]),start);
+  while(h.size){const[r,c]=h.pop(),id=gi(r,c);if(dn[id])continue;dn[id]=1;o.push([r,c]);if(r===end[0]&&c===end[1])break;
+    for(const[dr,dc]of DIRS){const nr=r+dr,nc=c+dc;if(nr<0||nc<0||nr>=rows||nc>=cols)continue;if(!walk(nr,nc))continue;const ni=gi(nr,nc),ng=g[id]+1;if(ng<g[ni]){g[ni]=ng;par[ni]=id;h.push(ng+Hf(nr,nc),[nr,nc]);}}}
+  const p=rebuild(par,start,end);return{o,p,f:p.length>0};}
+const SOLVERS={bfs:sBFS,dfs:sDFS,dijkstra:sDij,astar:sAStar};
+const TAG={bfs:"BFS",dfs:"DFS",dijkstra:"Dijkstra",astar:"A*"};
+
+function run(){
+  clearSolution();
+  const res=SOLVERS[algo]();
+  const om={}; res.o.forEach(([r,c],i)=>{om[r*cols+c]=i;});
+  anim={order:res.o,orderMap:om,maxOrder:res.o.length-1,path:res.p,found:res.f,revealCount:0,pathCount:0,phase:"search"};
+  const spf=reduce?1e9:SPEED_MAP[+el("speed").value];
+  el("solve").disabled=true;
+  const roomsOf=a=>thin?a.filter(([r,c])=>r%2===1&&c%2===1).length:a.length;
+  const visited=roomsOf(res.o), plen=res.f?(thin?Math.max(0,roomsOf(res.p)-1):res.p.length-1):null;
+  const stats={visited,length:plen,eff:res.f&&visited?Math.round((plen+1)/visited*100):null,algo:TAG[algo],found:res.f};
+  function frame(){
+    if(anim.phase==="search"){
+      anim.revealCount=Math.min(anim.revealCount+spf,anim.order.length); draw();
+      stVisited.textContent=roomsOf(anim.order.slice(0,anim.revealCount)).toLocaleString(); stVisited.classList.remove("mut");
+      if(anim.revealCount>=anim.order.length){anim.phase="path";if(!anim.found){fin();return;}}
+      rafId=requestAnimationFrame(frame);
+    } else {
+      anim.pathCount=Math.min(anim.pathCount+Math.max(1,Math.round(spf/4)),anim.path.length); draw();
+      if(anim.pathCount>=anim.path.length){fin();return;}
+      rafId=requestAnimationFrame(frame);
+    }
+  }
+  function fin(){stopAnim();setStats(stats);el("solve").disabled=false;}
+  stAlgo.textContent=TAG[algo]; stAlgo.classList.remove("mut");
+  rafId=requestAnimationFrame(frame);
+}
+function generateMaze(){
+  stopAnim();
+  if(thin){ newGrid(currentSize); }
+  grid=Array.from({length:rows},()=>new Array(cols).fill(WALL));
+  const st=[[1,1]]; grid[1][1]=EMPTY; const J=[[-2,0],[2,0],[0,-2],[0,2]];
+  while(st.length){const[r,c]=st[st.length-1],op=[];
+    for(const[dr,dc]of J){const nr=r+dr,nc=c+dc;if(nr>0&&nc>0&&nr<rows-1&&nc<cols-1&&grid[nr][nc]===WALL)op.push([nr,nc,r+dr/2,c+dc/2]);}
+    if(op.length){const[nr,nc,wr,wc]=op[(Math.random()*op.length)|0];grid[wr][wc]=EMPTY;grid[nr][nc]=EMPTY;st.push([nr,nc]);}else st.pop();}
+  start=[1,1]; end=[rows-2,cols-2]; grid[start[0]][start[1]]=EMPTY; grid[end[0]][end[1]]=EMPTY;
+  clearSolution(); resize(); setMsg("迷路を生成しました。アルゴリズムを選んで解いてみましょう。");
+}
+function clearWalls(){
+  stopAnim();
+  if(thin){ for(let r=1;r<rows-1;r++)for(let c=1;c<cols-1;c++) if(!(r%2===0&&c%2===0)) grid[r][c]=EMPTY; }
+  else for(let r=1;r<rows-1;r++)for(let c=1;c<cols-1;c++) grid[r][c]=EMPTY;
+  clearSolution(); draw(); setMsg("壁を消去しました。");
+}
+const stVisited=el("stVisited"),stLength=el("stLength"),stEff=el("stEff"),stAlgo=el("stAlgo"),msg=el("msg");
+function setStats(s){
+  if(!s){[stVisited,stLength,stEff,stAlgo].forEach(n=>{n.textContent="—";n.classList.add("mut");});return;}
+  stVisited.textContent=s.visited.toLocaleString(); stVisited.classList.remove("mut");
+  stAlgo.textContent=s.algo; stAlgo.classList.remove("mut");
+  if(s.found){ stLength.textContent=s.length; stLength.classList.remove("mut");
+    stEff.textContent=s.eff+"%"; stEff.classList.remove("mut");
+    setMsg(`探索完了：${s.visited.toLocaleString()}マスを調べ、${s.length}歩の経路を発見しました。`);
+  } else { stLength.textContent="—";stLength.classList.add("mut");stEff.textContent="—";stEff.classList.add("mut");
+    setMsg("ゴールに到達できませんでした。壁が閉じ込めていないか確認し、ペンで通路を開けてください。",true); }
+}
+function setMsg(t,w=false){ msg.textContent=t; msg.classList.toggle("warn",w); }
+
+
+// ================= import =================
+const fileInput=el("file"), modal=el("importModal");
+const icv=el("importCanvas"), ictx=icv.getContext("2d");
+const pcv=el("prevCanvas"), pctx=pcv.getContext("2d");
+let imgEl=null,imgW=0,imgH=0,rawPx=null;
+let inkImg=null, corners=null, det=null;
+let iCols=21,iRows=15,iInv=false,iThScale=1.0;
+let drag=-1;
+
+const stat=t=>{el("impStatus").textContent=t;};
+const defer=fn=>setTimeout(fn,20);
+const gridOpts=()=>({bandFrac:.25,samples:14,thScale:iThScale});
+
+el("importBtn").addEventListener("click",()=>fileInput.click());
+el("sheetBtn").addEventListener("click",()=>{
+  const html=document.getElementById("gridSheet").textContent;
+  const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+  let w=null;
+  try{ w=window.open(url,"_blank"); }catch(e){ w=null; }
+  if(w){ setTimeout(()=>URL.revokeObjectURL(url),60000); return; }
+  // embedded in an iframe (e.g. Google Sites): pop-ups are blocked, so download instead
+  const a=document.createElement("a");
+  a.href=url; a.download="方眼用紙_21x15.html";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  setMsg("方眼用紙をダウンロードしました。開いて印刷してください。");
+});
+fileInput.addEventListener("change",e=>{const f=e.target.files[0];if(f)loadImg(f);fileInput.value="";});
+function loadImg(f){
+  const url=URL.createObjectURL(f), im=new Image();
+  im.onload=()=>{
+    imgEl=im;
+    const s=Math.min(1,1200/Math.max(im.naturalWidth,im.naturalHeight));
+    imgW=Math.round(im.naturalWidth*s); imgH=Math.round(im.naturalHeight*s);
+    const off=document.createElement("canvas"); off.width=imgW; off.height=imgH;
+    const o=off.getContext("2d"); o.drawImage(im,0,0,imgW,imgH);
+    rawPx=o.getImageData(0,0,imgW,imgH).data;
+    icv.width=imgW; icv.height=imgH; icv.style.width="100%"; icv.style.height="auto";
+    el("impWarn").textContent=""; modal.hidden=false;
+    stat("画像を解析しています…"); det=null; corners=null; drawImport();
+    URL.revokeObjectURL(url);
+    defer(()=>{ buildInk(); autoCorners(); autoSize(); });
+  };
+  im.onerror=()=>setMsg("画像を読み込めませんでした。",true);
+  im.src=url;
+}
+function buildInk(){ inkImg=inkImage(rawPx,imgW,imgH,Math.max(8,Math.round(imgW/28)),iInv); }
+function fallbackQuad(){ const k=.03;
+  return [{x:imgW*k,y:imgH*k},{x:imgW*(1-k),y:imgH*k},{x:imgW*(1-k),y:imgH*(1-k)},{x:imgW*k,y:imgH*(1-k)}]; }
+function autoCorners(){
+  const f=findCornerMarks(rawPx,imgW,imgH);
+  if(f){ corners=f; stat("四隅マークを検出しました。"); }
+  else { corners=fallbackQuad(); stat("四隅マークが見つかりません。四隅を迷路の角へドラッグしてください。"); }
+}
+function autoSize(){
+  if(!corners) return;
+  stat("方眼の周期からマス数を推定しています…");
+  defer(()=>{
+    const ag=autoGrid(inkImg,imgW,imgH,corners,45);
+    if(ag.cols) iCols=ag.cols; if(ag.rows) iRows=ag.rows;
+    el("impCols").value=iCols; el("colVal").textContent=iCols;
+    el("impRows").value=iRows; el("rowVal").textContent=iRows;
+    detectNow();
+  });
+}
+function detectNow(){
+  if(!inkImg||!corners) return;
+  det=detectWalls(inkImg,imgW,imgH,corners,iCols,iRows,gridOpts());
+  stat(`${iCols}×${iRows} マス / 壁 ${det.count} 本を検出`);
+  drawImport(); drawPreview();
+}
+function drawImport(){
+  if(!imgEl) return;
+  ictx.clearRect(0,0,imgW,imgH); ictx.drawImage(imgEl,0,0,imgW,imgH);
+  ictx.fillStyle="rgba(252,251,247,.30)"; ictx.fillRect(0,0,imgW,imgH);
+  if(!corners) return;
+  const P=homography(corners);
+  ictx.strokeStyle="rgba(60,130,246,.8)"; ictx.lineWidth=Math.max(1,imgW*.0013);
+  for(let c=0;c<=iCols;c++){ ictx.beginPath();
+    for(let t=0;t<=16;t++){ const p=P(c/iCols,t/16); t?ictx.lineTo(p.x,p.y):ictx.moveTo(p.x,p.y); } ictx.stroke(); }
+  for(let r=0;r<=iRows;r++){ ictx.beginPath();
+    for(let t=0;t<=16;t++){ const p=P(t/16,r/iRows); t?ictx.lineTo(p.x,p.y):ictx.moveTo(p.x,p.y); } ictx.stroke(); }
+  if(det){
+    ictx.strokeStyle="rgba(220,0,120,.9)"; ictx.lineWidth=Math.max(4,Math.min(imgW,imgH)*.009); ictx.lineCap="round";
+    for(let r=0;r<iRows;r++)for(let c=0;c<=iCols;c++) if(det.vwall[r][c]){
+      const a=P(c/iCols,r/iRows),b=P(c/iCols,(r+1)/iRows);
+      ictx.beginPath();ictx.moveTo(a.x,a.y);ictx.lineTo(b.x,b.y);ictx.stroke(); }
+    for(let r=0;r<=iRows;r++)for(let c=0;c<iCols;c++) if(det.hwall[r][c]){
+      const a=P(c/iCols,r/iRows),b=P((c+1)/iCols,r/iRows);
+      ictx.beginPath();ictx.moveTo(a.x,a.y);ictx.lineTo(b.x,b.y);ictx.stroke(); }
+  }
+  const hr=Math.max(10,Math.max(imgW,imgH)*.019);
+  corners.forEach((p,i)=>{ictx.beginPath();ictx.arc(p.x,p.y,hr,0,7);
+    ictx.fillStyle=(i===drag)?"#C11574":"#F0A202";ictx.fill();
+    ictx.lineWidth=Math.max(2,hr*.28);ictx.strokeStyle="#2B303B";ictx.stroke();});
+}
+// heat-map of per-edge ink mass: what the threshold is actually deciding on
+function drawPreview(){
+  if(!det) return;
+  const cw=26, W2=iCols*cw, H2=iRows*cw;
+  pcv.width=W2; pcv.height=H2; pcv.style.width="100%"; pcv.style.height="auto";
+  pctx.fillStyle="#FCFBF7"; pctx.fillRect(0,0,W2,H2);
+  let mx=1; det.masses.V.forEach(r=>r.forEach(v=>{if(v>mx)mx=v;}));
+  det.masses.Hh.forEach(r=>r.forEach(v=>{if(v>mx)mx=v;}));
+  const col=(v,on)=>{ const t=Math.min(1,v/mx);
+    return on? `rgba(220,0,120,${0.35+0.65*t})` : `rgba(43,48,59,${0.10+0.35*t})`; };
+  const lw=Math.max(2,cw*0.22);
+  for(let r=0;r<iRows;r++)for(let c=0;c<=iCols;c++){
+    pctx.strokeStyle=col(det.masses.V[r][c],det.vwall[r][c]); pctx.lineWidth=lw;
+    pctx.beginPath(); pctx.moveTo(c*cw,r*cw); pctx.lineTo(c*cw,(r+1)*cw); pctx.stroke(); }
+  for(let r=0;r<=iRows;r++)for(let c=0;c<iCols;c++){
+    pctx.strokeStyle=col(det.masses.Hh[r][c],det.hwall[r][c]); pctx.lineWidth=lw;
+    pctx.beginPath(); pctx.moveTo(c*cw,r*cw); pctx.lineTo((c+1)*cw,r*cw); pctx.stroke(); }
+}
+function ip(e){const b=icv.getBoundingClientRect();return{x:(e.clientX-b.left)*(imgW/b.width),y:(e.clientY-b.top)*(imgH/b.height)};}
+icv.addEventListener("pointerdown",e=>{if(!corners)return;e.preventDefault();icv.setPointerCapture(e.pointerId);
+  const p=ip(e);let bd=Math.max(24,Math.max(imgW,imgH)*.06);drag=-1;
+  corners.forEach((c,i)=>{const d=Math.hypot(c.x-p.x,c.y-p.y);if(d<bd){bd=d;drag=i;}});drawImport();});
+icv.addEventListener("pointermove",e=>{if(drag<0)return;const p=ip(e);
+  corners[drag].x=Math.max(-imgW*.1,Math.min(imgW*1.1,p.x));
+  corners[drag].y=Math.max(-imgH*.1,Math.min(imgH*1.1,p.y));drawImport();});
+["pointerup","pointercancel"].forEach(ev=>icv.addEventListener(ev,()=>{if(drag>=0){drag=-1;detectNow();}}));
+el("impAuto").addEventListener("click",()=>{stat("解析中…");defer(()=>{buildInk();autoCorners();autoSize();});});
+el("impFit").addEventListener("click",autoSize);
+el("impCols").addEventListener("input",e=>{iCols=+e.target.value;el("colVal").textContent=iCols;});
+el("impRows").addEventListener("input",e=>{iRows=+e.target.value;el("rowVal").textContent=iRows;});
+el("impTh").addEventListener("input",e=>{iThScale=+e.target.value/100;el("thVal").textContent=e.target.value+"%";});
+["impCols","impRows","impTh"].forEach(id=>el(id).addEventListener("change",detectNow));
+el("impInvert").addEventListener("change",e=>{iInv=e.target.checked;stat("解析中…");defer(()=>{buildInk();detectNow();});});
+el("impClose").addEventListener("click",()=>{modal.hidden=true;});
+el("impCancel").addEventListener("click",()=>{modal.hidden=true;});
+el("impRepick").addEventListener("click",()=>fileInput.click());
+el("impApply").addEventListener("click",()=>{
+  if(!det){el("impWarn").textContent="まだ解析中です。少し待ってからお試しください。";return;}
+  const R=iRows,C=iCols,ER=2*R+1,EC=2*C+1;
+  const g=Array.from({length:ER},()=>new Array(EC).fill(WALL));
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)g[2*r+1][2*c+1]=EMPTY;
+  for(let r=0;r<R;r++)for(let c=0;c<=C;c++)g[2*r+1][2*c]=det.vwall[r][c]?WALL:EMPTY;
+  for(let r=0;r<=R;r++)for(let c=0;c<C;c++)g[2*r][2*c+1]=det.hwall[r][c]?WALL:EMPTY;
+  for(let r=0;r<ER;r++){g[r][0]=WALL;g[r][EC-1]=WALL;}
+  for(let c=0;c<EC;c++){g[0][c]=WALL;g[ER-1][c]=WALL;}
+  rows=ER;cols=EC;grid=g;thin=true;start=[1,1];end=[ER-2,EC-2];
+  clearSolution(); modal.hidden=true; resize();
+  setMsg(`写真から ${C}×${R} の迷路を読み込みました。誤検出はペンで直せます。`);
+});
+
+// ================= wiring =================
+
+
+el("speed").addEventListener("input",()=>{el("speedVal").textContent=SPEED_LABEL[+el("speed").value];});
+el("tools").addEventListener("click",e=>{const b=e.target.closest("button[data-tool]");if(!b)return;tool=b.dataset.tool;document.querySelectorAll("#tools button").forEach(x=>x.setAttribute("aria-pressed",x===b));});
+el("algos").addEventListener("click",e=>{const b=e.target.closest("button[data-algo]");if(!b)return;algo=b.dataset.algo;document.querySelectorAll("#algos button").forEach(x=>x.setAttribute("aria-pressed",x===b));if(anim)run();});
+el("sizes").addEventListener("click",e=>{const b=e.target.closest("button[data-size]");if(!b)return;currentSize=b.dataset.size;newGrid(currentSize);resize();setMsg("盤面サイズを変更しました。");});
+el("gen").addEventListener("click",generateMaze);
+el("clearWalls").addEventListener("click",clearWalls);
+el("solve").addEventListener("click",run);
+window.addEventListener("keydown",e=>{if(!modal.hidden){if(e.key==="Escape")closeM();return;}if(e.target.tagName==="INPUT")return;
+  if(e.code==="Space"){e.preventDefault();run();}else if(e.key==="g"||e.key==="G")generateMaze();else if(e.key==="c"||e.key==="C")clearWalls();});
+window.addEventListener("resize",()=>{dprv=Math.max(1,window.devicePixelRatio||1);resize();});
+
+newGrid(currentSize); generateMaze();
+setMsg("紙の写真を読み込むか、自動生成した迷路で「探索して解く」を押してください。");
+})();
+</script>
+</body>
+</html>
